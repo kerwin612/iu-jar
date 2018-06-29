@@ -1,6 +1,11 @@
 # iu-jar
 
 An incremental upgrade tool for jar packages
+
+To install `iu-jar`, use pip:  
+`pip install iu-jar`  
+then, run with `iujar`  
+
 ```
 Usage:iujar [option]
 
