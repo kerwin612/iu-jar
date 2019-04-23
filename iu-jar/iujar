@@ -21,7 +21,7 @@ Usage:%s [option]
         list-file-path:             string, path of 'list-file' file
 
      -i old-jar -t new-jar [-n incremental-pkg-name] [-d incremental-pkg-dir] [-f force-path]: generate incremental jar
-        old-jar:                    string, path of old-jar file
+        old-jar:                    string, path of 'old-jar|list-file' file
         new-jar:                    string, path of new-jar file
         incremental-pkg-name:       string, name of output, default is [old-jar].incremental
         incremental-pkg-dir:        string, dir of output, default is current dir
@@ -35,7 +35,7 @@ Usage:%s [option]
         ignore-path:                regex, match the file path that needs to be ignore to update
 
  example:
-     %s -i temp/test.jar -t temp/test_new.jar -d temp.out -f '/BOOT-INF/(classes/*|lib/com\.mpr\.*)|/META-INF/*'
+     %s -i temp/test.jar -t temp/test_new.jar -d temp.out -f '/BOOT-INF/(classes/*|lib/org\.ileler\..*)|/META-INF/*'
      %s -u temp/test.jar -a temp.out/test.jar.incremental -d temp.out
 
     ''' % (sys.argv[0], sys.argv[0], sys.argv[0]))
@@ -43,7 +43,7 @@ Usage:%s [option]
 
 def increment():
     oj, nj, ipn, ipd, fp = incrementConfig['oj'], incrementConfig['nj'], incrementConfig['ipn'], incrementConfig['ipd'], incrementConfig['fp']
-    if oj is None or not os.path.exists(oj) or not zipfile.is_zipfile(oj):
+    if oj is None or not os.path.exists(oj):
         print('[-i old-jar] invalid')
         sys.exit()
     if nj is None or not os.path.exists(nj) or not zipfile.is_zipfile(nj):
@@ -54,39 +54,56 @@ def increment():
     if ipd is None:
         ipd = './'    
     if fp is not None:
-        print('force-path: ' + fp)
+        print('force update: ' + fp)
 
     #mkdir temp work dir
     tempdir = ipd + '/' + ipn + '.tmp'
-    tempdir_old = tempdir + '/' + 'old'
     tempdir_new = tempdir + '/' + 'new'
     tempdir_inc = tempdir + '/' + 'inc'
     if os.path.exists(tempdir): rmtree(tempdir)
     os.makedirs(tempdir)
-    os.makedirs(tempdir_old)
     os.makedirs(tempdir_new)
     os.makedirs(tempdir_inc)
+
+    ofns = None
+    tempdir_old = None
+    if zipfile.is_zipfile(oj):
+        tempdir_old = tempdir + '/' + 'old'
+        os.makedirs(tempdir_old)
+        with zipfile.ZipFile(oj, 'r') as jar: jar.extractall(tempdir_old)
+    else:
+        ofns = open(oj)
+        
     
     #extract dir
-    with zipfile.ZipFile(oj, 'r') as jar: jar.extractall(tempdir_old)
     with zipfile.ZipFile(nj, 'r') as jar: jar.extractall(tempdir_new)
+
+    if fp is not None:
+        open(tempdir_inc + '/__force-path__', 'w').write(fp)
 
     #find delete file
     with open(tempdir_inc + '/__delete__', 'w') as delfile:
         delfiles = ''
-        for root, dirs, files, in os.walk(tempdir_old):
-            for d in dirs:
-                newpath = os.path.join(root.replace(tempdir_old, '') if root != tempdir_old else '/', d)
-                _newpath = tempdir_new + '/' + newpath
-                if os.path.exists(os.path.dirname(_newpath)) and not os.path.exists(_newpath):
-                    delfiles += newpath + '\n'
-                    print('increment delete: ' + newpath)
-            for f in files:
-                newpath = os.path.join(root.replace(tempdir_old, '') if root != tempdir_old else '/', f)
-                _newpath = tempdir_new + '/' + newpath
-                if os.path.exists(os.path.dirname(_newpath)) and not os.path.exists(_newpath):
-                    delfiles += newpath + '\n'
-                    print('increment delete: ' + newpath)
+        if tempdir_old is not None:
+            for root, dirs, files, in os.walk(tempdir_old):
+                for d in dirs:
+                    newpath = os.path.join(root.replace(tempdir_old, '') if root != tempdir_old else '/', d)
+                    _newpath = tempdir_new + '/' + newpath
+                    if os.path.exists(os.path.dirname(_newpath)) and not os.path.exists(_newpath):
+                        delfiles += newpath + '\n'
+                        print('increment delete: ' + newpath)
+                for f in files:
+                    newpath = os.path.join(root.replace(tempdir_old, '') if root != tempdir_old else '/', f)
+                    _newpath = tempdir_new + '/' + newpath
+                    if os.path.exists(os.path.dirname(_newpath)) and not os.path.exists(_newpath):
+                        delfiles += newpath + '\n'
+                        print('increment delete: ' + newpath)
+        else:
+            for ofn in ofns:
+                nfn = tempdir_new + '/' + ofn.rstrip('\n')
+                if not os.path.exists(nfn):
+                    delfiles += ofn
+                    print('increment delete: ' + ofn.rstrip('\n'))
         delfile.write(delfiles)
 
     #find update file
@@ -99,9 +116,9 @@ def increment():
             print('increment update: ' + _fpd.replace(tempdir_inc, '' if tempdir_inc != root else '/'))
             continue
         for f in files:
-            oldpath = os.path.join(root.replace(tempdir_new, tempdir_old), f)
+            oldpath = None if tempdir_old is None else os.path.join(root.replace(tempdir_new, tempdir_old), f)
             fpf = os.path.join(root.replace(tempdir_new, '' if tempdir_new != root else '/'), f)
-            if (fp is not None and re.match(r'' + fp, fpf)) or not os.path.exists(oldpath):
+            if (fp is not None and re.match(r'' + fp, fpf)) or ((oldpath is not None and not os.path.exists(oldpath)) or (ofns is not None and (fpf + '\n') not in ofns)):
                 if not os.path.exists(_fpd): os.makedirs(_fpd)
                 copyfile(os.path.join(root, f), os.path.join(_fpd, f))
                 print('increment update: ' + fpf)
@@ -149,16 +166,21 @@ def update():
 
     #find delete file
     with open(tempdir_inc + '/__delete__', 'r') as delfile:
+        fpfc = None
         delfiles = delfile.read()
+        fpfn = tempdir_inc + '/__force-path__'
+        if os.path.exists(fpfn):
+            fpfc = open(fpfn).read()
+            print('force update: ' + fpfc)
         for root, dirs, files in os.walk(tempdir_src):
             for d in dirs:
                 newpath = os.path.join(root.replace(tempdir_src, '') if root != tempdir_src else '/', d)
-                if (newpath + '\n') in delfiles and (ips is None or not re.match(r'' + ips, newpath)):
+                if (re.match(r'' + fpfc, newpath) or (newpath + '\n') in delfiles) and (ips is None or not re.match(r'' + ips, newpath)):
                     print('delete dir: ' + newpath)
                     rmtree(os.path.join(root, d))
             for f in files:
                 newpath = os.path.join(root.replace(tempdir_src, '') if root != tempdir_src else '/', f)
-                if (newpath + '\n') in delfiles and (ips is None or not re.match(r'' + ips, newpath)):
+                if (re.match(r'' + fpfc, newpath) or (newpath + '\n') in delfiles) and (ips is None or not re.match(r'' + ips, newpath)):
                     print('delete file: ' + newpath)
                     os.remove(os.path.join(root, f))
         for root, dirs, files in os.walk(tempdir_inc):
@@ -169,7 +191,7 @@ def update():
                     print('update dir: ' + newpath)
                     move(os.path.join(root, d), _newpath)
            for f in files:
-                if f == '__delete__': continue
+                if f == '__delete__' or f == '__force-path__': continue
                 fp = os.path.join(root, f)
                 newpath = os.path.join(root.replace(tempdir_inc, '') if root != tempdir_inc else '/', f)
                 if os.path.exists(fp) and (ips is None or not re.match(r'' + ips, newpath)):
@@ -207,6 +229,8 @@ def listJar():
         if ofile is not None:
             ofile.write("%s\n" % n)
         print(n)
+    if ofp is not None:
+        ofile.close()
 
 
 
