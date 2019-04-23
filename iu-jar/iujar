@@ -16,6 +16,10 @@ Usage:%s [option]
 
      -h or --help: show help info
 
+     -l target-jar [-o list-file-path]: list table of contents for jar
+        target-jar:                 string, path of jar file that need to list
+        list-file-path:             string, path of 'list-file' file
+
      -i old-jar -t new-jar [-n incremental-pkg-name] [-d incremental-pkg-dir] [-f force-path]: generate incremental jar
         old-jar:                    string, path of old-jar file
         new-jar:                    string, path of new-jar file
@@ -187,6 +191,25 @@ def update():
 
 
 
+def listJar():
+    tj, ofp = listJarConfig['tj'], listJarConfig['ofp']
+    if tj is None or not os.path.exists(tj) or not zipfile.is_zipfile(tj):
+        print('[-u target-jar] invalid')
+        sys.exit()
+    #print('\n'.join(n for n in zipfile.ZipFile(tj).namelist()))
+    ofile = None
+    if ofp is not None:
+        dname = os.path.dirname(os.path.abspath(ofp))
+        if not os.path.exists(dname):
+            os.makedirs(dname)
+        ofile = open(ofp, 'w')
+    for n in zipfile.ZipFile(tj).namelist():
+        if ofile is not None:
+            ofile.write("%s\n" % n)
+        print(n)
+
+
+
 incrementConfig = {
     'oj': None,
     'nj': None,
@@ -203,8 +226,13 @@ updateConfig = {
     'ips': None
 }
 
+listJarConfig = {
+    'tj': None,
+    'ofp': None
+}
+
 try:
-    opts, args = getopt.getopt(sys.argv[1:] if len(sys.argv) > 1 else [], 'hi:u:n:d:t:I:f:a:', ['help'])
+    opts, args = getopt.getopt(sys.argv[1:] if len(sys.argv) > 1 else [], 'hi:u:n:d:t:I:f:a:l:o:', ['help'])
     cmd, arg = opts[0] if len(opts) > 0 else (None, None)
     if cmd is None or cmd in ('-h', '--help'):
         usage()
@@ -213,6 +241,8 @@ try:
         incrementConfig['oj'] = arg
     elif cmd in ('-u'):
         updateConfig['tj'] = arg
+    elif cmd in ('-l'):
+        listJarConfig['tj'] = arg
     else:
         print('unknow cmd: ' + cmd)
         sys.exit()
@@ -240,11 +270,15 @@ for cmd, arg in opts:
         incrementConfig['fp'] = arg
     elif cmd in ('-a'): 
         updateConfig['ip'] = arg
+    elif cmd in ('-o'): 
+        listJarConfig['ofp'] = arg
 
 if incrementConfig['oj'] is not None:
     increment()
 elif updateConfig['tj'] is not None:
     update()
+elif listJarConfig['tj'] is not None:
+    listJar()
 else:
     usage()
 
