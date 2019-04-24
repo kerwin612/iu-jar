@@ -13,8 +13,12 @@ Usage:iujar [option]
 
      -h or --help: show help info
 
+     -l target-jar [-o list-file-path]: list table of contents for jar
+        target-jar:                 string, path of jar file that need to list
+        list-file-path:             string, path of 'list-file' file
+
      -i old-jar -t new-jar [-n incremental-pkg-name] [-d incremental-pkg-dir] [-f force-path]: generate incremental jar
-        old-jar:                    string, path of old-jar file
+        old-jar:                    string, path of 'old-jar|list-file' file
         new-jar:                    string, path of new-jar file
         incremental-pkg-name:       string, name of output, default is [old-jar].incremental
         incremental-pkg-dir:        string, dir of output, default is current dir
@@ -28,6 +32,6 @@ Usage:iujar [option]
         ignore-path:                regex, match the file path that needs to be ignore to update
 
  example:
-     iujar -i temp/test.jar -t temp/test_new.jar -d temp.out -f '/BOOT-INF/(classes/*|lib/com\.mpr\.*)|/META-INF/*'
-     iujar -u temp/test.jar -a temp.out/test.jar.incremental -d temp.out
+     %s -i temp/test.jar -t temp/test_new.jar -d temp.out -f '/BOOT-INF/(classes/*|lib/org\.ileler\..*)|/META-INF/*'
+     %s -u temp/test.jar -a temp.out/test.jar.incremental -d temp.out
 ```
