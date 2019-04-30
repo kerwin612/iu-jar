@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="iu-jar",
-    version="0.0.4",
+    version="0.0.5",
     author="ileler",
     author_email="kerwin612@qq.com",
     description="An incremental upgrade tool for jar packages",
@@ -14,7 +14,7 @@ setuptools.setup(
     url="https://github.com/ileler/iu-jar",
     packages=setuptools.find_packages(),
     classifiers=(
-        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ),

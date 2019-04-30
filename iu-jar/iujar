@@ -175,12 +175,12 @@ def update():
         for root, dirs, files in os.walk(tempdir_src):
             for d in dirs:
                 newpath = os.path.join(root.replace(tempdir_src, '') if root != tempdir_src else '/', d)
-                if (re.match(r'' + fpfc, newpath) or (newpath + '\n') in delfiles) and (ips is None or not re.match(r'' + ips, newpath)):
+                if ((fpfc is not None and re.match(r'' + fpfc, newpath)) or (newpath + '\n') in delfiles) and (ips is None or not re.match(r'' + ips, newpath)):
                     print('delete dir: ' + newpath)
                     rmtree(os.path.join(root, d))
             for f in files:
                 newpath = os.path.join(root.replace(tempdir_src, '') if root != tempdir_src else '/', f)
-                if (re.match(r'' + fpfc, newpath) or (newpath + '\n') in delfiles) and (ips is None or not re.match(r'' + ips, newpath)):
+                if ((fpfc is not None and re.match(r'' + fpfc, newpath)) or (newpath + '\n') in delfiles) and (ips is None or not re.match(r'' + ips, newpath)):
                     print('delete file: ' + newpath)
                     os.remove(os.path.join(root, f))
         for root, dirs, files in os.walk(tempdir_inc):
