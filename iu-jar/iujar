@@ -6,6 +6,7 @@ import re
 import sys
 import getopt
 import zipfile
+import hashlib
 from shutil import copy, copyfile, copytree, rmtree, move
 
 def usage():
@@ -41,6 +42,14 @@ Usage:%s [option]
     ''' % (sys.argv[0], sys.argv[0], sys.argv[0]))
 
 
+def md5(fname):
+    hash_md5 = hashlib.md5()
+    with open(fname, 'rb') as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+
 def increment():
     oj, nj, ipn, ipd, fp = incrementConfig['oj'], incrementConfig['nj'], incrementConfig['ipn'], incrementConfig['ipd'], incrementConfig['fp']
     if oj is None or not os.path.exists(oj):
@@ -68,6 +77,10 @@ def increment():
     ofns = None
     tempdir_old = None
     if zipfile.is_zipfile(oj):
+        if md5(oj) == md5(nj) and fp is None:
+            print('two files are the same file')
+            rmtree(tempdir)
+            return
         tempdir_old = tempdir + '/' + 'old'
         os.makedirs(tempdir_old)
         with zipfile.ZipFile(oj, 'r') as jar: jar.extractall(tempdir_old)
@@ -116,11 +129,12 @@ def increment():
             print('increment update: ' + _fpd.replace(tempdir_inc, '' if tempdir_inc != root else '/'))
             continue
         for f in files:
+            newpath = os.path.join(root, f)
             oldpath = None if tempdir_old is None else os.path.join(root.replace(tempdir_new, tempdir_old), f)
             fpf = os.path.join(root.replace(tempdir_new, '' if tempdir_new != root else '/'), f)
-            if (fp is not None and re.match(r'' + fp, fpf)) or ((oldpath is not None and not os.path.exists(oldpath)) or (ofns is not None and (fpf + '\n') not in ofns)):
+            if (fp is not None and re.match(r'' + fp, fpf)) or ((oldpath is not None and (not os.path.exists(oldpath) or md5(oldpath) != md5(newpath))) or (ofns is not None and (fpf + '\n') not in ofns)):
                 if not os.path.exists(_fpd): os.makedirs(_fpd)
-                copyfile(os.path.join(root, f), os.path.join(_fpd, f))
+                copyfile(newpath, os.path.join(_fpd, f))
                 print('increment update: ' + fpf)
 
     #generate increment jar
